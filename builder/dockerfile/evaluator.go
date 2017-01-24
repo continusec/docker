@@ -36,6 +36,7 @@ var replaceEnvAllowed = map[string]bool{
 	command.Copy:       true,
 	command.Workdir:    true,
 	command.Expose:     true,
+	command.Extern:     true,
 	command.Volume:     true,
 	command.User:       true,
 	command.StopSignal: true,
@@ -66,6 +67,7 @@ func init() {
 		command.Entrypoint:  entrypoint,
 		command.Env:         env,
 		command.Expose:      expose,
+		command.Extern:      extern,
 		command.From:        from,
 		command.Healthcheck: healthcheck,
 		command.Label:       label,
@@ -200,7 +202,7 @@ func (b *Builder) dispatch(stepN int, stepTotal int, ast *parser.Node) error {
 		return f(b, strList, attrs, original)
 	}
 
-	return fmt.Errorf("Unknown instruction: %s", upperCasedCmd)
+	return fmt.Errorf("Unknownn instruction: %s", upperCasedCmd)
 }
 
 // checkDispatch does a simple check for syntax errors of the Dockerfile.

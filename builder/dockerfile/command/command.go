@@ -10,6 +10,7 @@ const (
 	Entrypoint  = "entrypoint"
 	Env         = "env"
 	Expose      = "expose"
+	Extern      = "extern"
 	From        = "from"
 	Healthcheck = "healthcheck"
 	Label       = "label"
@@ -32,6 +33,7 @@ var Commands = map[string]struct{}{
 	Entrypoint:  {},
 	Env:         {},
 	Expose:      {},
+	Extern:      {},
 	From:        {},
 	Healthcheck: {},
 	Label:       {},

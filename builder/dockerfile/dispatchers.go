@@ -320,6 +320,22 @@ func workdir(b *Builder, args []string, attributes map[string]bool, original str
 	return b.commit(container.ID, cmd, comment)
 }
 
+// EXTERN [imagename, arg1, arg2]
+//
+// Run image name, which must output a TAR that is extracted at /
+//
+func extern(b *Builder, args []string, attributes map[string]bool, original string) error {
+	if len(args) == 0 {
+		return errAtLeastOneArgument("EXTERN")
+	}
+
+	if err := b.flags.Parse(); err != nil {
+		return err
+	}
+
+	return b.commit("", b.runConfig.Cmd, fmt.Sprintf("EXTERN %s", strings.Join(b.flags.Args, " ")))
+}
+
 // RUN some command yo
 //
 // run a command and commit the image. Args are automatically prepended with
