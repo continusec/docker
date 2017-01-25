@@ -146,6 +146,9 @@ type Backend interface {
 
 	// SquashImage squashes the fs layers from the provided image down to the specified `to` image
 	SquashImage(from string, to string) (string, error)
+
+	// Get ImageInspect data
+	LookupImage(name string) (*types.ImageInspect, error)
 }
 
 // Image represents a Docker image used by the builder.

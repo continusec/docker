@@ -367,6 +367,26 @@ func extern(b *Builder, args []string, attributes map[string]bool, original stri
 	}
 
 	logrus.Debugf("[EXTERN] Success, received image ID: %s", imageID)
+
+	imgInspect, err := b.docker.LookupImage(imageID)
+	if err != nil {
+		return err
+	}
+
+	if len(imgInspect.RootFS.Layers) == 0 {
+		return errors.New("no layers were built by subprocess")
+	}
+
+	targetLayer := imgInspect.RootFS.Layers[len(imgInspect.RootFS.Layers)-1]
+
+	logrus.Debugf("[EXTERN] Last layer built: %s", targetLayer)
+
+	/*img, err := b.docker.GetImageOnBuild(imageID)
+	if err != nil {
+		return err
+	}*/
+
+	return b.commit("", b.runConfig.Cmd, fmt.Sprintf("EXTERN %s", strings.Join(args, " ")))
 }
 
 // RUN some command yo
