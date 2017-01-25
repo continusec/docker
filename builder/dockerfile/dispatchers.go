@@ -17,8 +17,6 @@ import (
 	"strings"
 	"time"
 
-	"encoding/json"
-
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api"
 	"github.com/docker/docker/api/types"
@@ -322,92 +320,53 @@ func workdir(b *Builder, args []string, attributes map[string]bool, original str
 	return b.commit(container.ID, cmd, comment)
 }
 
-// EXTERN [imagename, arg1, arg2]
+// EXTERN ["SubDockerfile", arg1, arg2]
 //
-// Run image name, which must output a TAR that is extracted at /
+// Execute another Dockerfile, must be in context.
 //
 func extern(b *Builder, args []string, attributes map[string]bool, original string) error {
 	if len(args) == 0 {
 		return errAtLeastOneArgument("EXTERN")
 	}
 
-	logrus.Debugf("[EXTERN] Creating container... %#v", args)
+	logrus.Debugf("[EXTERN] Executing subdocker file: %s", args[0])
 
-	for _, a := range args {
-		fmt.Println("Arg:", a)
-	}
-	fmt.Println("Orig:", original)
-	for k, v := range attributes {
-		fmt.Println("Attr K:", k, " V:", v)
-	}
-
-	var ccc types.ContainerCreateConfig
-	err := json.Unmarshal([]byte(args[0]), &ccc)
+	subdockerfile, err := b.context.Open(args[0])
 	if err != nil {
 		return err
 	}
 
-	if ccc.Config == nil {
-		ccc.Config = &container.Config{}
-	}
-	ccc.Config.AttachStdout = true
-
-	if ccc.HostConfig == nil {
-		ccc.HostConfig = &container.HostConfig{}
-	}
-	ccc.HostConfig.AutoRemove = true
-
-	c, err := b.docker.ContainerCreate(ccc)
+	sub, err := NewBuilder(b.clientCtx, &types.ImageBuildOptions{ // inherit most but not all
+		SuppressOutput: b.options.SuppressOutput,
+		NoCache:        b.options.NoCache,
+		Remove:         b.options.Remove,
+		ForceRemove:    b.options.ForceRemove,
+		PullParent:     b.options.PullParent,
+		Isolation:      b.options.Isolation,
+		CPUSetCPUs:     b.options.CPUSetCPUs,
+		CPUSetMems:     b.options.CPUSetMems,
+		CPUShares:      b.options.CPUShares,
+		CPUQuota:       b.options.CPUQuota,
+		CPUPeriod:      b.options.CPUPeriod,
+		Memory:         b.options.Memory,
+		MemorySwap:     b.options.MemorySwap,
+		CgroupParent:   b.options.CgroupParent,
+		NetworkMode:    b.options.NetworkMode,
+		ShmSize:        b.options.ShmSize,
+		Ulimits:        b.options.Ulimits,
+		SecurityOpt:    b.options.SecurityOpt,
+		Dockerfile:     "Dockerfile",
+	}, b.docker, b.context, subdockerfile)
 	if err != nil {
 		return err
 	}
 
-	err = b.run(c.ID)
+	imageID, err := sub.build(b.Stdout, b.Stderr, b.Output)
 	if err != nil {
 		return err
 	}
-	/*
-		logrus.Debugf("[EXTERN] Created with ID: %s. Starting...", c.ID)
 
-		err = b.docker.ContainerStart(c.ID, nil, "", "")
-		if err != nil {
-			return err
-		}
-
-		logrus.Debugf("[EXTERN] Starting, now attaching...")
-
-		pr, pw := io.Pipe()
-		wg := &sync.WaitGroup{}
-		var e1 error
-		var data []byte
-
-		go func() {
-			defer wg.Done()
-			data, e1 = ioutil.ReadAll(pr)
-		}()
-
-		err = b.docker.ContainerAttachRaw(c.ID, nil, pw, nil, true)
-		if err != nil {
-			return err
-		}
-
-		logrus.Debugf("[EXTERN] Attached, waiting for completion...")
-
-		rc, err := b.docker.ContainerWait(c.ID, time.Minute)
-		if err != nil {
-			return err
-		}
-
-		logrus.Debugf("[EXTERN] Complete. Return code: %d. Waiting for stdout...", rc)
-
-		wg.Wait()
-		if e1 != nil {
-			return e1
-		}
-
-		logrus.Debugf("[EXTERN] Complete. Return code: %d, Data: %s", rc, string(data))
-	*/
-	return b.commit("", b.runConfig.Cmd, fmt.Sprintf("EXTERN %s", strings.Join(args, " ")))
+	logrus.Debugf("[EXTERN] Success, received image ID: %s", imageID)
 }
 
 // RUN some command yo
