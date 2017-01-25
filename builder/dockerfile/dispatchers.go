@@ -17,6 +17,8 @@ import (
 	"strings"
 	"time"
 
+	"encoding/json"
+
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api"
 	"github.com/docker/docker/api/types"
@@ -329,11 +331,83 @@ func extern(b *Builder, args []string, attributes map[string]bool, original stri
 		return errAtLeastOneArgument("EXTERN")
 	}
 
-	if err := b.flags.Parse(); err != nil {
+	logrus.Debugf("[EXTERN] Creating container... %#v", args)
+
+	for _, a := range args {
+		fmt.Println("Arg:", a)
+	}
+	fmt.Println("Orig:", original)
+	for k, v := range attributes {
+		fmt.Println("Attr K:", k, " V:", v)
+	}
+
+	var ccc types.ContainerCreateConfig
+	err := json.Unmarshal([]byte(args[0]), &ccc)
+	if err != nil {
 		return err
 	}
 
-	return b.commit("", b.runConfig.Cmd, fmt.Sprintf("EXTERN %s", strings.Join(b.flags.Args, " ")))
+	if ccc.Config == nil {
+		ccc.Config = &container.Config{}
+	}
+	ccc.Config.AttachStdout = true
+
+	if ccc.HostConfig == nil {
+		ccc.HostConfig = &container.HostConfig{}
+	}
+	ccc.HostConfig.AutoRemove = true
+
+	c, err := b.docker.ContainerCreate(ccc)
+	if err != nil {
+		return err
+	}
+
+	err = b.run(c.ID)
+	if err != nil {
+		return err
+	}
+	/*
+		logrus.Debugf("[EXTERN] Created with ID: %s. Starting...", c.ID)
+
+		err = b.docker.ContainerStart(c.ID, nil, "", "")
+		if err != nil {
+			return err
+		}
+
+		logrus.Debugf("[EXTERN] Starting, now attaching...")
+
+		pr, pw := io.Pipe()
+		wg := &sync.WaitGroup{}
+		var e1 error
+		var data []byte
+
+		go func() {
+			defer wg.Done()
+			data, e1 = ioutil.ReadAll(pr)
+		}()
+
+		err = b.docker.ContainerAttachRaw(c.ID, nil, pw, nil, true)
+		if err != nil {
+			return err
+		}
+
+		logrus.Debugf("[EXTERN] Attached, waiting for completion...")
+
+		rc, err := b.docker.ContainerWait(c.ID, time.Minute)
+		if err != nil {
+			return err
+		}
+
+		logrus.Debugf("[EXTERN] Complete. Return code: %d. Waiting for stdout...", rc)
+
+		wg.Wait()
+		if e1 != nil {
+			return e1
+		}
+
+		logrus.Debugf("[EXTERN] Complete. Return code: %d, Data: %s", rc, string(data))
+	*/
+	return b.commit("", b.runConfig.Cmd, fmt.Sprintf("EXTERN %s", strings.Join(args, " ")))
 }
 
 // RUN some command yo

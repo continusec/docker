@@ -80,7 +80,7 @@ func init() {
 		command.Entrypoint:  parseMaybeJSON,
 		command.Env:         parseEnv,
 		command.Expose:      parseStringsWhitespaceDelimited,
-		command.Extern:      parseMaybeJSONToList,
+		command.Extern:      parseString,
 		command.From:        parseString,
 		command.Healthcheck: parseHealthConfig,
 		command.Label:       parseLabel,
