@@ -20,6 +20,7 @@ import (
 type CommonAPIClient interface {
 	ContainerAPIClient
 	ImageAPIClient
+	LayerAPIClient
 	NodeAPIClient
 	NetworkAPIClient
 	PluginAPIClient
@@ -84,6 +85,11 @@ type ImageAPIClient interface {
 	ImageSave(ctx context.Context, images []string) (io.ReadCloser, error)
 	ImageTag(ctx context.Context, image, ref string) error
 	ImagesPrune(ctx context.Context, pruneFilter filters.Args) (types.ImagesPruneReport, error)
+}
+
+// LayerAPIClient defines API client methods for the layers
+type LayerAPIClient interface {
+	InspectLayer(ctx context.Context, name string) (*types.LayerInfo, []byte, error)
 }
 
 // NetworkAPIClient defines API client methods for the networks

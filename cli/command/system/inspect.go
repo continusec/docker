@@ -65,6 +65,12 @@ func inspectImages(ctx context.Context, dockerCli *command.DockerCli) inspect.Ge
 	}
 }
 
+func inspectLayers(ctx context.Context, dockerCli *command.DockerCli) inspect.GetRefFunc {
+	return func(ref string) (interface{}, []byte, error) {
+		return dockerCli.Client().InspectLayer(ctx, ref)
+	}
+}
+
 func inspectNetwork(ctx context.Context, dockerCli *command.DockerCli) inspect.GetRefFunc {
 	return func(ref string) (interface{}, []byte, error) {
 		return dockerCli.Client().NetworkInspectWithRaw(ctx, ref)
@@ -116,6 +122,10 @@ func inspectAll(ctx context.Context, dockerCli *command.DockerCli, getSize bool,
 		{
 			objectType:      "image",
 			objectInspector: inspectImages(ctx, dockerCli),
+		},
+		{
+			objectType:      "layer",
+			objectInspector: inspectLayers(ctx, dockerCli),
 		},
 		{
 			objectType:      "network",
