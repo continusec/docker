@@ -1,8 +1,6 @@
 package daemon
 
 import (
-	"fmt"
-
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/layer"
 	digest "github.com/opencontainers/go-digest"
@@ -19,24 +17,10 @@ func (daemon *Daemon) InspectLayer(name string) (*types.LayerInfo, error) {
 		return nil, err
 	}
 
-	lref, err := daemon.layerStore.Get(layer.ChainID(id))
-	if err != nil {
-		return nil, err
-	}
-	
-	md, err := lref.Metadata()
+	li, err := daemon.layerStore.GetDiffInfo(layer.DiffID(id))
 	if err != nil {
 		return nil, err
 	}
 
-	fmt.Printf("%#v\n", md)
-
-	return &types.LayerInfo{
-		Name: id.String(),
-		Diffs: []*types.DiffInfo{
-			&types.DiffInfo{
-				Path: "foo",
-			},
-		},
-	}, nil
+	return li, nil
 }

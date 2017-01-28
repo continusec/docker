@@ -1,4 +1,4 @@
-// +build solaris,cgo
+// +build solaris,cgo darwin
 
 package initlayer
 
