@@ -3,7 +3,6 @@ package client
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"io/ioutil"
 	"net/http"
 
@@ -11,9 +10,19 @@ import (
 	"golang.org/x/net/context"
 )
 
+type layerNotFoundError struct {}
+
+func (e *layerNotFoundError) NotFound() bool {
+	return true
+}
+
+func (e *layerNotFoundError) Error() string {
+	return "layer not found"
+}
+
 var (
 	// ErrLayerNotFound returned when layer not found
-	ErrLayerNotFound = errors.New("Layer not found")
+	ErrLayerNotFound = &layerNotFoundError{}
 )
 
 // InspectLayer returns the layer information and its raw representation.
