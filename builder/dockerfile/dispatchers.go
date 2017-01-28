@@ -356,12 +356,12 @@ func extern(b *Builder, args []string, attributes map[string]bool, original stri
 		Ulimits:        b.options.Ulimits,
 		SecurityOpt:    b.options.SecurityOpt,
 		Dockerfile:     "Dockerfile",
-	}, b.docker, b.context, subdockerfile)
+	}, b.docker, b.context, subdockerfile, b.depth+1)
 	if err != nil {
 		return err
 	}
 
-	imageID, err := sub.build(b.Stdout, b.Stderr, b.Output)
+	imageID, err := sub.build(NewIndentedStream(b.Stdout, sub.depth), NewIndentedStream(b.Stderr, sub.depth), NewIndentedStream(b.Output, sub.depth))
 	if err != nil {
 		return err
 	}
