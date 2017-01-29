@@ -1,6 +1,5 @@
 FROM alpine:latest
 
-EXTERN BuildHelloWorld
+CHERRYPICK ["BuildGo", "gosrc", "github.com/golang/example/hello"]
 
 ENTRYPOINT ["/bin/hello"]
-

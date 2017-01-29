@@ -350,6 +350,11 @@ func (daemon *Daemon) CopyLayerOnBuild(cID string, diffID layer.DiffID) error {
 	}
 	defer daemon.Unmount(c)
 
+	dest, err := c.GetResourcePath(filepath.FromSlash("/"))
+	if err != nil {
+		return err
+	}
+
 	uidMaps, gidMaps := daemon.GetUIDGIDMaps()
 	archiver := &archive.Archiver{
 		Untar:   chrootarchive.Untar,
@@ -357,12 +362,11 @@ func (daemon *Daemon) CopyLayerOnBuild(cID string, diffID layer.DiffID) error {
 		GIDMaps: gidMaps,
 	}
 
-	// try to successfully untar the orig
 	src, err := daemon.layerStore.GetDiffTarStream(diffID)
 	if err != nil {
-	    return err
+		return err
 	}
-	return archiver.UntarReader(src, "/")
+	return archiver.UntarReader(src, dest)
 }
 
 // CopyOnBuild copies/extracts a source FileInfo to a destination path inside a container

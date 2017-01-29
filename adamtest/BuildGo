@@ -1,0 +1,7 @@
+FROM golang:1.7
+
+ARG gosrc
+
+RUN go get ${gosrc}
+
+RUN cp /go/bin/* /bin/

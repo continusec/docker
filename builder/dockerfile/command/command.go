@@ -5,12 +5,12 @@ package command
 const (
 	Add         = "add"
 	Arg         = "arg"
+	Cherrypick  = "cherrypick"
 	Cmd         = "cmd"
 	Copy        = "copy"
 	Entrypoint  = "entrypoint"
 	Env         = "env"
 	Expose      = "expose"
-	Extern      = "extern"
 	From        = "from"
 	Healthcheck = "healthcheck"
 	Label       = "label"
@@ -28,12 +28,12 @@ const (
 var Commands = map[string]struct{}{
 	Add:         {},
 	Arg:         {},
+	Cherrypick:  {},
 	Cmd:         {},
 	Copy:        {},
 	Entrypoint:  {},
 	Env:         {},
 	Expose:      {},
-	Extern:      {},
 	From:        {},
 	Healthcheck: {},
 	Label:       {},

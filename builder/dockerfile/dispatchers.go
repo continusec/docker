@@ -320,22 +320,42 @@ func workdir(b *Builder, args []string, attributes map[string]bool, original str
 	return b.commit(container.ID, cmd, comment)
 }
 
-// EXTERN ["SubDockerfile", arg1, arg2]
+// CHERRYPICK ["SubDockerfile", "buildArgName", "buildArgValue"]
 //
 // Execute another Dockerfile, must be in context.
 //
-func extern(b *Builder, args []string, attributes map[string]bool, original string) error {
-	if len(args) == 0 {
-		return errAtLeastOneArgument("EXTERN")
+func cherrypick(b *Builder, args []string, attributes map[string]bool, original string) error {
+	if len(args)%2 != 1 {
+		return errors.New("CHERRYPICK requires an odd number of arguments. Dockerfile followed by name/value pairs for optional build arguments")
 	}
 
-	logrus.Debugf("[EXTERN] Executing subdocker file: %s", args[0])
+	// Extract build args
+	ba := map[string]*string{}
+	for i := 1; i < len(args); i += 2 {
+		ba[args[i]] = &args[i+1]
+	}
+
+	// Create sorted list for cache keys
+	sortedKeys := make([]string, len(ba))
+	i := 0
+	for k := range ba {
+		sortedKeys[i] = k
+		i++
+	}
+	sort.Strings(sortedKeys)
+
+	// Normalized command to show
+	cmdToShow := args[0]
+	for _, k := range sortedKeys {
+		cmdToShow += fmt.Sprintf(" --%s=%s", k, *ba[k])
+	}
+
+	logrus.Debugf("[CHERRYPICK] Executing subdocker file: %s", cmdToShow)
 
 	subdockerfile, err := b.context.Open(args[0])
 	if err != nil {
 		return err
 	}
-
 	sub, err := NewBuilder(b.clientCtx, &types.ImageBuildOptions{ // inherit most but not all
 		SuppressOutput: b.options.SuppressOutput,
 		NoCache:        b.options.NoCache,
@@ -355,7 +375,8 @@ func extern(b *Builder, args []string, attributes map[string]bool, original stri
 		ShmSize:        b.options.ShmSize,
 		Ulimits:        b.options.Ulimits,
 		SecurityOpt:    b.options.SecurityOpt,
-		Dockerfile:     "Dockerfile",
+		Dockerfile:     args[0],
+		BuildArgs:      ba,
 	}, b.docker, b.context, subdockerfile, b.depth+1)
 	if err != nil {
 		return err
@@ -366,7 +387,7 @@ func extern(b *Builder, args []string, attributes map[string]bool, original stri
 		return err
 	}
 
-	logrus.Debugf("[EXTERN] Success, received image ID: %s", imageID)
+	logrus.Debugf("[CHERRYPICK] Success, received image ID: %s", imageID)
 
 	imgInspect, err := b.docker.LookupImage(imageID)
 	if err != nil {
@@ -379,9 +400,9 @@ func extern(b *Builder, args []string, attributes map[string]bool, original stri
 
 	targetLayer := imgInspect.RootFS.Layers[len(imgInspect.RootFS.Layers)-1]
 
-	logrus.Debugf("[EXTERN] Last layer built: %s", targetLayer)
+	logrus.Debugf("[CHERRYPICK] Last layer built: %s", targetLayer)
 
-	return b.runInsertLayerCommand(targetLayer, fmt.Sprintf("EXTERN %s", strings.Join(args, " ")))
+	return b.runInsertLayerCommand(targetLayer, fmt.Sprintf("CHERRYPICK %s", cmdToShow))
 }
 
 // RUN some command yo
