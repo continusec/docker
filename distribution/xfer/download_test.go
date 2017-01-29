@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/docker/distribution"
+	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/image"
 	"github.com/docker/docker/layer"
 	"github.com/docker/docker/pkg/progress"
@@ -151,6 +152,14 @@ func (ls *mockLayerStore) DriverStatus() [][2]string {
 
 func (ls *mockLayerStore) DriverName() string {
 	return "mock"
+}
+
+func (ls *mockLayerStore) GetDiffTarStream(d layer.DiffID) (io.ReadCloser, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (ls *mockLayerStore) GetDiffInfo(d layer.DiffID) (*types.LayerInfo, error) {
+	return nil, errors.New("not implemented")
 }
 
 type mockDownloadDescriptor struct {

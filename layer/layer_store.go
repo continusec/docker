@@ -1,6 +1,8 @@
 package layer
 
 import (
+	"archive/tar"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"io"
@@ -9,6 +11,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/distribution"
+	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/daemon/graphdriver"
 	"github.com/docker/docker/pkg/idtools"
 	"github.com/docker/docker/pkg/plugingetter"
@@ -31,6 +34,8 @@ type layerStore struct {
 
 	layerMap map[ChainID]*roLayer
 	layerL   sync.Mutex
+
+	diffIDToChains map[DiffID]map[ChainID]*roLayer
 
 	mounts map[string]*mountedLayer
 	mountL sync.Mutex
@@ -79,6 +84,8 @@ func NewStoreFromGraphDriver(store MetadataStore, driver graphdriver.Driver) (St
 		driver:   driver,
 		layerMap: map[ChainID]*roLayer{},
 		mounts:   map[string]*mountedLayer{},
+
+		diffIDToChains: map[DiffID]map[ChainID]*roLayer{},
 	}
 
 	ids, mounts, err := store.List()
@@ -156,6 +163,12 @@ func (ls *layerStore) loadLayer(layer ChainID) (*roLayer, error) {
 	}
 
 	ls.layerMap[cl.chainID] = cl
+	subMap, ok := ls.diffIDToChains[cl.diffID]
+	if !ok {
+		subMap = map[ChainID]*roLayer{}
+		ls.diffIDToChains[cl.diffID] = subMap
+	}
+	subMap[cl.chainID] = cl
 
 	return cl, nil
 }
@@ -327,6 +340,12 @@ func (ls *layerStore) registerWithDescriptor(ts io.Reader, parent ChainID, descr
 	}
 
 	ls.layerMap[layer.chainID] = layer
+	subMap, ok := ls.diffIDToChains[layer.diffID]
+	if !ok {
+		subMap = map[ChainID]*roLayer{}
+		ls.diffIDToChains[layer.diffID] = subMap
+	}
+	subMap[layer.chainID] = layer
 
 	return layer.getReference(), nil
 }
@@ -418,6 +437,13 @@ func (ls *layerStore) releaseLayer(l *roLayer) ([]Metadata, error) {
 		}
 
 		delete(ls.layerMap, l.chainID)
+		subMap, ok := ls.diffIDToChains[l.diffID]
+		if ok {
+			delete(subMap, l.chainID)
+			if len(subMap) == 0 {
+				delete(ls.diffIDToChains, l.diffID)
+			}
+		}
 		removed = append(removed, metadata)
 
 		if l.parent == nil {
@@ -671,6 +697,60 @@ func (ls *layerStore) DriverStatus() [][2]string {
 
 func (ls *layerStore) DriverName() string {
 	return ls.driver.String()
+}
+
+// GetDiffTarStream returns a tar stream for a given diffID.
+func (ls *layerStore) GetDiffTarStream(d DiffID) (io.ReadCloser, error) {
+	ls.layerL.Lock()
+	defer ls.layerL.Unlock()
+
+	subMap, ok := ls.diffIDToChains[d]
+	if !ok {
+		return nil, ErrLayerDoesNotExist
+	}
+
+	var rv *roLayer
+	for _, v := range subMap {
+		rv = v
+		break
+	}
+
+	if rv == nil {
+		return nil, ErrLayerDoesNotExist
+	}
+
+	return rv.TarStream()
+}
+
+// GetDiffInfo returns metadata about a given diffID.
+func (ls *layerStore) GetDiffInfo(d DiffID) (*types.LayerInfo, error) {
+	rc, err := ls.GetDiffTarStream(d)
+	if err != nil {
+		return nil, err
+	}
+
+	tarReader := tar.NewReader(rc)
+	li := &types.LayerInfo{
+		Name:  d.String(),
+		Diffs: nil,
+	}
+	for {
+		hdr, err := tarReader.Next()
+		if err == io.EOF {
+			return li, nil
+		}
+
+		sum := sha256.New()
+		_, err = io.CopyN(sum, tarReader, hdr.Size)
+		if err != nil {
+			return nil, err
+		}
+
+		li.Diffs = append(li.Diffs, &types.DiffInfo{
+			Path:   hdr.Name,
+			Sum256: sum.Sum(nil),
+		})
+	}
 }
 
 type naiveDiffPathDriver struct {

@@ -47,6 +47,19 @@ type ImageInspect struct {
 	RootFS          RootFS
 }
 
+// DiffInfo is part of LayerInfo below
+type DiffInfo struct {
+	Path   string
+	Sum256 []byte
+}
+
+// LayerInfo is for layer inspect API:
+// GET "/layers/{name:.*}/json"
+type LayerInfo struct {
+	Name  string
+	Diffs []*DiffInfo
+}
+
 // Container contains response of Engine API:
 // GET "/containers/json"
 type Container struct {

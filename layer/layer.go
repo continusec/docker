@@ -15,6 +15,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/distribution"
+	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/pkg/archive"
 	"github.com/opencontainers/go-digest"
 )
@@ -183,6 +184,9 @@ type Store interface {
 	Get(ChainID) (Layer, error)
 	Map() map[ChainID]Layer
 	Release(Layer) ([]Metadata, error)
+
+	GetDiffTarStream(d DiffID) (io.ReadCloser, error)
+	GetDiffInfo(d DiffID) (*types.LayerInfo, error)
 
 	CreateRWLayer(id string, parent ChainID, opts *CreateRWLayerOpts) (RWLayer, error)
 	GetRWLayer(id string) (RWLayer, error)
