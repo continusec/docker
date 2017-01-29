@@ -1,3 +1,5 @@
 FROM alpine:latest
 
+RUN echo "foo"
+
 RUN cd /tmp; wget http://www.knighterrant.com.au/static/images/shutterstock_411173689.jpg

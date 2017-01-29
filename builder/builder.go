@@ -13,6 +13,7 @@ import (
 	"github.com/docker/docker/api/types/backend"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/image"
+	"github.com/docker/docker/layer"
 	"github.com/docker/docker/reference"
 	"golang.org/x/net/context"
 )
@@ -140,6 +141,9 @@ type Backend interface {
 	// ContainerCopy(name string, res string) (io.ReadCloser, error)
 	// TODO: use copyBackend api
 	CopyOnBuild(containerID string, destPath string, src FileInfo, decompress bool) error
+
+	// CopyLayerOnBuild applies an existing diff ID inside a container specified by a container object
+	CopyLayerOnBuild(containerID string, diffID layer.DiffID) error
 
 	// HasExperimental checks if the backend supports experimental features
 	HasExperimental() bool

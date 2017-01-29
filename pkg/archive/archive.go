@@ -748,6 +748,7 @@ loop:
 		if err != nil {
 			return err
 		}
+		fmt.Printf("%#v\n", hdr)
 
 		// Normalize name, for safety and for a simple is-root check
 		// This keeps "../" as-is, but normalizes "/../" to "/". Or Windows:
@@ -918,6 +919,17 @@ func (archiver *Archiver) TarUntar(src, dst string) error {
 	}
 	defer archive.Close()
 
+	return archiver.UntarReader(archive, dst)
+}
+
+// TarUntar is a convenience function which calls Tar and Untar, with the output of one piped into the other.
+// If either Tar or Untar fails, TarUntar aborts and returns the error.
+func TarUntar(src, dst string) error {
+	return defaultArchiver.TarUntar(src, dst)
+}
+
+// UntarReader will untar a reader to the dst with the assigned UID / GUID maps.
+func (archiver *Archiver) UntarReader(src io.Reader, dst string) error {
 	var options *TarOptions
 	if archiver.UIDMaps != nil || archiver.GIDMaps != nil {
 		options = &TarOptions{
@@ -925,13 +937,12 @@ func (archiver *Archiver) TarUntar(src, dst string) error {
 			GIDMaps: archiver.GIDMaps,
 		}
 	}
-	return archiver.Untar(archive, dst, options)
+	return archiver.Untar(src, dst, options)
 }
 
-// TarUntar is a convenience function which calls Tar and Untar, with the output of one piped into the other.
-// If either Tar or Untar fails, TarUntar aborts and returns the error.
-func TarUntar(src, dst string) error {
-	return defaultArchiver.TarUntar(src, dst)
+// UntarReader is a convenience function unpacks an archive at `dst`.
+func UntarReader(src io.Reader, dst string) error {
+	return defaultArchiver.UntarReader(src, dst)
 }
 
 // UntarPath untar a file from path to a destination, src is the source tar file path.
@@ -941,14 +952,8 @@ func (archiver *Archiver) UntarPath(src, dst string) error {
 		return err
 	}
 	defer archive.Close()
-	var options *TarOptions
-	if archiver.UIDMaps != nil || archiver.GIDMaps != nil {
-		options = &TarOptions{
-			UIDMaps: archiver.UIDMaps,
-			GIDMaps: archiver.GIDMaps,
-		}
-	}
-	return archiver.Untar(archive, dst, options)
+
+	return archiver.UntarReader(archive, dst)
 }
 
 // UntarPath is a convenience function which looks for an archive

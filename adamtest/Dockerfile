@@ -1,7 +1,6 @@
 FROM alpine:latest
 
-RUN echo fizzle9 | tee /tmp/baz1
+EXTERN BuildHelloWorld
 
-EXTERN ["SubDockerfile"]
+ENTRYPOINT ["/bin/hello"]
 
-RUN echo fizzle7 | tee /tmp/baz7

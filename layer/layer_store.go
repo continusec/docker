@@ -377,7 +377,7 @@ func (ls *layerStore) Get(l ChainID) (Layer, error) {
 	return layer.getReference(), nil
 }
 
-func (ls *layerStore) GetDiffInfo(d DiffID) (*types.LayerInfo, error) {
+func (ls *layerStore) GetDiffTarStream(d DiffID) (io.ReadCloser, error) {
 	ls.layerL.Lock()
 	defer ls.layerL.Unlock()
 
@@ -396,7 +396,11 @@ func (ls *layerStore) GetDiffInfo(d DiffID) (*types.LayerInfo, error) {
 		return nil, ErrLayerDoesNotExist
 	}
 
-	rc, err := rv.TarStream()
+	return rv.TarStream()
+}
+
+func (ls *layerStore) GetDiffInfo(d DiffID) (*types.LayerInfo, error) {
+	rc, err := ls.GetDiffTarStream(d)
 	if err != nil {
 		return nil, err
 	}

@@ -10,6 +10,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/builder"
 	"github.com/docker/docker/container"
+	"github.com/docker/docker/layer"
 	"github.com/docker/docker/pkg/archive"
 	"github.com/docker/docker/pkg/chrootarchive"
 	"github.com/docker/docker/pkg/idtools"
@@ -235,7 +236,7 @@ func (daemon *Daemon) containerExtractToDir(container *container.Container, path
 	if strings.HasPrefix(resolvedPath, `\\?\Volume{`) {
 		if strings.HasPrefix(resolvedPath, container.BaseFS) {
 			baseRel = resolvedPath[len(container.BaseFS):]
-			if baseRel[:1] == `\` {
+			if baseRel[:1] == "\\" {
 				baseRel = baseRel[1:]
 			}
 		}
@@ -336,6 +337,32 @@ func (daemon *Daemon) containerCopy(container *container.Container, resource str
 	})
 	daemon.LogContainerEvent(container, "copy")
 	return reader, nil
+}
+
+func (daemon *Daemon) CopyLayerOnBuild(cID string, diffID layer.DiffID) error {
+	c, err := daemon.GetContainer(cID)
+	if err != nil {
+		return err
+	}
+	err = daemon.Mount(c)
+	if err != nil {
+		return err
+	}
+	defer daemon.Unmount(c)
+
+	uidMaps, gidMaps := daemon.GetUIDGIDMaps()
+	archiver := &archive.Archiver{
+		Untar:   chrootarchive.Untar,
+		UIDMaps: uidMaps,
+		GIDMaps: gidMaps,
+	}
+
+	// try to successfully untar the orig
+	src, err := daemon.layerStore.GetDiffTarStream(diffID)
+	if err != nil {
+	    return err
+	}
+	return archiver.UntarReader(src, "/")
 }
 
 // CopyOnBuild copies/extracts a source FileInfo to a destination path inside a container

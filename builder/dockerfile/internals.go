@@ -25,6 +25,7 @@ import (
 	"github.com/docker/docker/api/types/strslice"
 	"github.com/docker/docker/builder"
 	"github.com/docker/docker/builder/dockerfile/parser"
+	"github.com/docker/docker/layer"
 	"github.com/docker/docker/pkg/archive"
 	"github.com/docker/docker/pkg/httputils"
 	"github.com/docker/docker/pkg/ioutils"
@@ -36,6 +37,7 @@ import (
 	"github.com/docker/docker/pkg/tarsum"
 	"github.com/docker/docker/pkg/urlutil"
 	"github.com/docker/docker/runconfig/opts"
+	digest "github.com/opencontainers/go-digest"
 )
 
 func (b *Builder) commit(id string, autoCmd strslice.StrSlice, comment string) error {
@@ -84,6 +86,39 @@ func (b *Builder) commit(id string, autoCmd strslice.StrSlice, comment string) e
 
 	b.image = imageID
 	return nil
+}
+
+func (b *Builder) runInsertLayerCommand(diffID string, cmdName string) error {
+	parsedID, err := digest.Parse(diffID)
+	if err != nil {
+		return err
+	}
+
+	srcPath := "diff:" + diffID
+
+	b.runConfig.Image = b.image
+	cmd := b.runConfig.Cmd
+	b.runConfig.Cmd = strslice.StrSlice(append(getShell(b.runConfig), fmt.Sprintf("#(nop) %s producing %s", cmdName, srcPath)))
+	defer func(cmd strslice.StrSlice) { b.runConfig.Cmd = cmd }(cmd)
+
+	if hit, err := b.probeCache(); err != nil {
+		return err
+	} else if hit {
+		return nil
+	}
+
+	container, err := b.docker.ContainerCreate(types.ContainerCreateConfig{Config: b.runConfig})
+	if err != nil {
+		return err
+	}
+	b.tmpContainers[container.ID] = struct{}{}
+
+	err = b.docker.CopyLayerOnBuild(container.ID, layer.DiffID(parsedID))
+	if err != nil {
+		return err
+	}
+
+	return b.commit(container.ID, cmd, fmt.Sprintf("%s producing layer %s", cmdName, diffID))
 }
 
 type copyInfo struct {

@@ -381,12 +381,7 @@ func extern(b *Builder, args []string, attributes map[string]bool, original stri
 
 	logrus.Debugf("[EXTERN] Last layer built: %s", targetLayer)
 
-	/*img, err := b.docker.GetImageOnBuild(imageID)
-	if err != nil {
-		return err
-	}*/
-
-	return b.commit("", b.runConfig.Cmd, fmt.Sprintf("EXTERN %s", strings.Join(args, " ")))
+	return b.runInsertLayerCommand(targetLayer, fmt.Sprintf("EXTERN %s", strings.Join(args, " ")))
 }
 
 // RUN some command yo

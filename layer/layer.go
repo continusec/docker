@@ -185,6 +185,7 @@ type Store interface {
 	Map() map[ChainID]Layer
 	Release(Layer) ([]Metadata, error)
 
+	GetDiffTarStream(d DiffID) (io.ReadCloser, error)
 	GetDiffInfo(d DiffID) (*types.LayerInfo, error)
 
 	CreateRWLayer(id string, parent ChainID, opts *CreateRWLayerOpts) (RWLayer, error)
