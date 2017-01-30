@@ -918,14 +918,7 @@ func (archiver *Archiver) TarUntar(src, dst string) error {
 	}
 	defer archive.Close()
 
-	var options *TarOptions
-	if archiver.UIDMaps != nil || archiver.GIDMaps != nil {
-		options = &TarOptions{
-			UIDMaps: archiver.UIDMaps,
-			GIDMaps: archiver.GIDMaps,
-		}
-	}
-	return archiver.Untar(archive, dst, options)
+	return archiver.UntarReader(archive, dst)
 }
 
 // TarUntar is a convenience function which calls Tar and Untar, with the output of one piped into the other.
@@ -941,14 +934,8 @@ func (archiver *Archiver) UntarPath(src, dst string) error {
 		return err
 	}
 	defer archive.Close()
-	var options *TarOptions
-	if archiver.UIDMaps != nil || archiver.GIDMaps != nil {
-		options = &TarOptions{
-			UIDMaps: archiver.UIDMaps,
-			GIDMaps: archiver.GIDMaps,
-		}
-	}
-	return archiver.Untar(archive, dst, options)
+
+	return archiver.UntarReader(archive, dst)
 }
 
 // UntarPath is a convenience function which looks for an archive
@@ -1090,6 +1077,23 @@ func (archiver *Archiver) CopyFileWithTar(src, dst string) (err error) {
 // `dst\base(src)` (Windows).
 func CopyFileWithTar(src, dst string) (err error) {
 	return defaultArchiver.CopyFileWithTar(src, dst)
+}
+
+// UntarReader will untar a reader to the dst with the assigned UID / GUID maps.
+func (archiver *Archiver) UntarReader(src io.Reader, dst string) error {
+	var options *TarOptions
+	if archiver.UIDMaps != nil || archiver.GIDMaps != nil {
+		options = &TarOptions{
+			UIDMaps: archiver.UIDMaps,
+			GIDMaps: archiver.GIDMaps,
+		}
+	}
+	return archiver.Untar(src, dst, options)
+}
+
+// UntarReader is a convenience function unpacks an archive at `dst`.
+func UntarReader(src io.Reader, dst string) error {
+	return defaultArchiver.UntarReader(src, dst)
 }
 
 // cmdStream executes a command, and returns its stdout as a stream.

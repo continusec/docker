@@ -10,6 +10,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/builder"
 	"github.com/docker/docker/container"
+	"github.com/docker/docker/layer"
 	"github.com/docker/docker/pkg/archive"
 	"github.com/docker/docker/pkg/chrootarchive"
 	"github.com/docker/docker/pkg/idtools"
@@ -336,6 +337,40 @@ func (daemon *Daemon) containerCopy(container *container.Container, resource str
 	})
 	daemon.LogContainerEvent(container, "copy")
 	return reader, nil
+}
+
+// CopyLayerOnBuild takes the layer pointed to by the diffID and cherry-picks
+// that on top of the container. Since we already have a diffID, we could likely
+// make this whole thing more efficient by bypassing all of this (ie copy in, then
+// later calculate diff, but keep simple for now.
+func (daemon *Daemon) CopyLayerOnBuild(cID string, diffID layer.DiffID) error {
+	c, err := daemon.GetContainer(cID)
+	if err != nil {
+		return err
+	}
+	err = daemon.Mount(c)
+	if err != nil {
+		return err
+	}
+	defer daemon.Unmount(c)
+
+	dest, err := c.GetResourcePath(filepath.FromSlash("/"))
+	if err != nil {
+		return err
+	}
+
+	uidMaps, gidMaps := daemon.GetUIDGIDMaps()
+	archiver := &archive.Archiver{
+		Untar:   chrootarchive.Untar,
+		UIDMaps: uidMaps,
+		GIDMaps: gidMaps,
+	}
+
+	src, err := daemon.layerStore.GetDiffTarStream(diffID)
+	if err != nil {
+		return err
+	}
+	return archiver.UntarReader(src, dest)
 }
 
 // CopyOnBuild copies/extracts a source FileInfo to a destination path inside a container
