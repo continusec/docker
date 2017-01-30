@@ -33,6 +33,7 @@ var replaceEnvAllowed = map[string]bool{
 	command.Env:        true,
 	command.Label:      true,
 	command.Add:        true,
+	command.Cherrypick: true,
 	command.Copy:       true,
 	command.Workdir:    true,
 	command.Expose:     true,
@@ -61,6 +62,7 @@ func init() {
 	evaluateTable = map[string]func(*Builder, []string, map[string]bool, string) error{
 		command.Add:         add,
 		command.Arg:         arg,
+		command.Cherrypick:  cherrypick,
 		command.Cmd:         cmd,
 		command.Copy:        dispatchCopy, // copy() is a go builtin
 		command.Entrypoint:  entrypoint,

@@ -320,6 +320,93 @@ func workdir(b *Builder, args []string, attributes map[string]bool, original str
 	return b.commit(container.ID, cmd, comment)
 }
 
+// CHERRYPICK ["SubDockerfile", "buildArg1Name", "buildArg1Value", ...]
+//
+// Execute another Dockerfile where the other Dockerfile exists in our context.
+// Optionally takes 1 or more <name, value> pairs that are passed as build arguments
+// to the child Dockerfile build.
+//
+func cherrypick(b *Builder, args []string, attributes map[string]bool, original string) error {
+	if len(args)%2 != 1 {
+		return errors.New("CHERRYPICK requires an odd number of arguments. Dockerfile followed by name/value pairs for optional build arguments")
+	}
+
+	// Extract build args
+	ba := map[string]*string{}
+	for i := 1; i < len(args); i += 2 {
+		ba[args[i]] = &args[i+1]
+	}
+
+	// Create sorted list for cache key
+	sortedKeys := make([]string, len(ba))
+	i := 0
+	for k := range ba {
+		sortedKeys[i] = k
+		i++
+	}
+	sort.Strings(sortedKeys)
+
+	// Normalized command to show
+	cmdToShow := args[0]
+	for _, k := range sortedKeys {
+		cmdToShow += fmt.Sprintf(" --%s=%s", k, *ba[k])
+	}
+
+	logrus.Debugf("[CHERRYPICK] Executing subdocker file: %s", cmdToShow)
+
+	subdockerfile, err := b.context.Open(args[0])
+	if err != nil {
+		return err
+	}
+	sub, err := NewBuilder(b.clientCtx, &types.ImageBuildOptions{ // inherit most but not all, TODO figure out the right list
+		SuppressOutput: b.options.SuppressOutput,
+		NoCache:        b.options.NoCache,
+		Remove:         b.options.Remove,
+		ForceRemove:    b.options.ForceRemove,
+		PullParent:     b.options.PullParent,
+		Isolation:      b.options.Isolation,
+		CPUSetCPUs:     b.options.CPUSetCPUs,
+		CPUSetMems:     b.options.CPUSetMems,
+		CPUShares:      b.options.CPUShares,
+		CPUQuota:       b.options.CPUQuota,
+		CPUPeriod:      b.options.CPUPeriod,
+		Memory:         b.options.Memory,
+		MemorySwap:     b.options.MemorySwap,
+		CgroupParent:   b.options.CgroupParent,
+		NetworkMode:    b.options.NetworkMode,
+		ShmSize:        b.options.ShmSize,
+		Ulimits:        b.options.Ulimits,
+		SecurityOpt:    b.options.SecurityOpt,
+		Dockerfile:     args[0],
+		BuildArgs:      ba,
+	}, b.docker, b.context, subdockerfile, b.depth+1)
+	if err != nil {
+		return err
+	}
+
+	imageID, err := sub.build(b.Stdout, b.Stderr, b.Output)
+	if err != nil {
+		return err
+	}
+
+	logrus.Debugf("[CHERRYPICK] Success, received image ID: %s", imageID)
+
+	imgInspect, err := b.docker.LookupImage(imageID)
+	if err != nil {
+		return err
+	}
+
+	if len(imgInspect.RootFS.Layers) == 0 {
+		return errors.New("no layers were built by subprocess")
+	}
+
+	targetLayer := imgInspect.RootFS.Layers[len(imgInspect.RootFS.Layers)-1]
+
+	logrus.Debugf("[CHERRYPICK] Last layer built: %s", targetLayer)
+
+	return b.runInsertLayerCommand(targetLayer, fmt.Sprintf("CHERRYPICK %s", cmdToShow))
+}
+
 // RUN some command yo
 //
 // run a command and commit the image. Args are automatically prepended with

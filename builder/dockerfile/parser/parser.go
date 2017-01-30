@@ -75,6 +75,7 @@ func init() {
 	dispatch = map[string]func(string, *Directive) (*Node, map[string]bool, error){
 		command.Add:         parseMaybeJSONToList,
 		command.Arg:         parseNameOrNameVal,
+		command.Cherrypick:  parseMaybeJSONToList,
 		command.Cmd:         parseMaybeJSON,
 		command.Copy:        parseMaybeJSONToList,
 		command.Entrypoint:  parseMaybeJSON,

@@ -5,6 +5,7 @@ package command
 const (
 	Add         = "add"
 	Arg         = "arg"
+	Cherrypick  = "cherrypick"
 	Cmd         = "cmd"
 	Copy        = "copy"
 	Entrypoint  = "entrypoint"
@@ -27,6 +28,7 @@ const (
 var Commands = map[string]struct{}{
 	Add:         {},
 	Arg:         {},
+	Cherrypick:  {},
 	Cmd:         {},
 	Copy:        {},
 	Entrypoint:  {},
