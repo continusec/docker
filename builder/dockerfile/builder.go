@@ -49,6 +49,16 @@ var BuiltinAllowedBuildArgs = map[string]bool{
 	"no_proxy":    true,
 }
 
+const (
+	// MaxDepth is the maximum stack depth of builds
+	MaxDepth = 20
+)
+
+var (
+	// ErrBuildTooDeep means build is too deep, maximum stack depth exceeded
+	ErrBuildTooDeep = errors.New("build is too deep, maximum stack depth exceeded")
+)
+
 // Builder is a Dockerfile builder
 // It implements the builder.Backend interface.
 type Builder struct {
@@ -81,6 +91,8 @@ type Builder struct {
 
 	imageCache builder.ImageCache
 	from       builder.Image
+
+	depth int // if greater than 0, we are in a sub-build
 }
 
 // BuildManager implements builder.Backend and is shared across all Builder objects.
@@ -111,7 +123,7 @@ func (bm *BuildManager) BuildFromContext(ctx context.Context, src io.ReadCloser,
 	if len(dockerfileName) > 0 {
 		buildOptions.Dockerfile = dockerfileName
 	}
-	b, err := NewBuilder(ctx, buildOptions, bm.backend, builder.DockerIgnoreContext{ModifiableContext: buildContext}, nil)
+	b, err := NewBuilder(ctx, buildOptions, bm.backend, builder.DockerIgnoreContext{ModifiableContext: buildContext}, nil, 0)
 	if err != nil {
 		return "", err
 	}
@@ -121,7 +133,10 @@ func (bm *BuildManager) BuildFromContext(ctx context.Context, src io.ReadCloser,
 // NewBuilder creates a new Dockerfile builder from an optional dockerfile and a Config.
 // If dockerfile is nil, the Dockerfile specified by Config.DockerfileName,
 // will be read from the Context passed to Build().
-func NewBuilder(clientCtx context.Context, config *types.ImageBuildOptions, backend builder.Backend, buildContext builder.Context, dockerfile io.ReadCloser) (b *Builder, err error) {
+func NewBuilder(clientCtx context.Context, config *types.ImageBuildOptions, backend builder.Backend, buildContext builder.Context, dockerfile io.ReadCloser, depth int) (b *Builder, err error) {
+	if depth > MaxDepth {
+		return nil, ErrBuildTooDeep
+	}
 	if config == nil {
 		config = new(types.ImageBuildOptions)
 	}
@@ -145,6 +160,7 @@ func NewBuilder(clientCtx context.Context, config *types.ImageBuildOptions, back
 			EscapeSeen:           false,
 			LookingForDirectives: true,
 		},
+		depth: depth,
 	}
 	if icb, ok := backend.(builder.ImageCacheBuilder); ok {
 		b.imageCache = icb.MakeImageCache(config.CacheFrom)
@@ -240,9 +256,15 @@ func (b *Builder) processLabels() error {
 // * Print a happy message and return the image ID.
 //
 func (b *Builder) build(stdout io.Writer, stderr io.Writer, out io.Writer) (string, error) {
-	b.Stdout = stdout
-	b.Stderr = stderr
-	b.Output = out
+	if b.depth == 0 {
+		b.Stdout = stdout
+		b.Stderr = stderr
+		b.Output = out
+	} else { // indent the output more than the parent build
+		b.Stdout = NewIndentedStream(stdout)
+		b.Stderr = NewIndentedStream(stderr)
+		b.Output = NewIndentedStream(out)
+	}
 
 	// If Dockerfile was not parsed yet, extract it from the Context
 	if b.dockerfile == nil {
@@ -346,7 +368,7 @@ func (b *Builder) Cancel() {
 //
 // TODO: Remove?
 func BuildFromConfig(config *container.Config, changes []string) (*container.Config, error) {
-	b, err := NewBuilder(context.Background(), nil, nil, nil, nil)
+	b, err := NewBuilder(context.Background(), nil, nil, nil, nil, 0)
 	if err != nil {
 		return nil, err
 	}
